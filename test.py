@@ -104,8 +104,11 @@ class ChooseRounds:
 
         self.questions_label.config(text=output)
 
-    def to_play(self, how_many):
-        Play(how_many)
+    def to_play(self, num_questions):
+        Play(num_questions)
+
+        # Hide root window (ie: hide rounds choice window).
+        root.withdraw()
 
 
 class Play:
@@ -119,17 +122,21 @@ class Play:
                                partial(self.close_play))
 
         # Variables used to work out statistics, when game ends etc
-        self.rounds_wanted = IntVar()
-        self.rounds_wanted.set(how_many)
+        self.questions_wanted = IntVar()
+        self.questions_wanted.set(how_many)
 
         # Initially set rounds played and rounds won to 0
-        self.rounds_played = IntVar()
-        self.rounds_played.set(0)
+        self.questions_played = IntVar()
+        self.questions_played.set(0)
 
-        self.rounds_won = IntVar()
-        self.rounds_won.set(0)
+        self.questions_won = IntVar()
+        self.questions_won.set(0)
+
+        self.stored_correct_answer = StringVar()
 
         self.user_scores = []
+
+        self.all_questions = self.get_all_questions()
 
         self.quest_frame = Frame(self.play_box, padx=10, pady=10)
         self.quest_frame.grid()
@@ -145,69 +152,58 @@ class Play:
                                         wraplength=350, justify="left")
         self.instructions_label.grid(row=1)
 
-        self.choice_frame = Frame(self.quest_frame)
-        self.choice_frame.grid(row=3)
+        self.button_question_list = []
 
-        self.first_choice_button = Button(self.choice_frame, text="Option 1:",
-                                          fg="#FFFFFF", bg="#008BFC",
-                                          font=("Arial", 11, "bold"),
-                                          width=10)
+        self.quest_button_ref = []
 
-        for item in range(1, 4):
-            self.choice_button = Button(self.choice_frame,
-                                        width=15,
-                                        command=lambda: self
-                                        )
-            self.choice_button.grid(row=3,
-                                    padx=5, pady=5)
+        for item in range(0, 4):
+            self.quest_button = Button(self.quest_frame,
+                                       width=25, wraplength=300,
+                                       command=lambda: self.to_compare()
+                                       )
+            self.quest_button.grid(row=item + 2,
+                                   padx=5, pady=5)
 
-        self.choice_frame = Frame(self.quest_frame)
-        self.choice_frame.grid(row=4)
+            # add button to reference list for later configuration
+            self.quest_button_ref.append(self.quest_button)
 
-        for item in range(1, 4):
-            self.choice_button = Button(self.choice_frame,
-                                        width=15,
-                                        command=lambda: self
-                                        )
-            self.choice_button.grid(row=4,
-                                    padx=5, pady=5)
+        self.next_button = Button(self.quest_frame, text="Next Round",
+                                  fg="#FFFFFF", bg="#008BFC",
+                                  font=("Arial", 11, "bold"),
+                                  width=10, state=DISABLED,
+                                  command=self.new_round)
+        self.next_button.grid(row=7)
 
-        self.choice_frame = Frame(self.quest_frame)
-        self.choice_frame.grid(row=5)
+        # at start, get 'new round'
+        self.new_round()
 
-        for item in range(1, 4):
-            self.choice_button = Button(self.choice_frame,
-                                        width=15,
-                                        command=lambda: self
-                                        )
-            self.choice_button.grid(row=5,
-                                    padx=5, pady=5)
+    def to_compare(self):
 
-        self.choice_frame = Frame(self.quest_frame)
-        self.choice_frame.grid(row=6)
+        how_many = self.questions_wanted.get()
+        correct_ans = self.stored_correct_answer.get()
 
-        for item in range(1, 4):
-            self.choice_button = Button(self.choice_frame,
-                                        width=15,
-                                        command=lambda: self
-                                        )
-            self.choice_button.grid(row=6,
-                                    padx=5, pady=5)
+        print(f"the correct answer in my compare function is: {correct_ans}")
 
-            # frame to include round results and next button
-            self.rounds_frame = Frame(self.quest_frame)
-            self.rounds_frame.grid(row=7, pady=5)
+        # Add one to number of rounds played
+        current_question = self.questions_played.get()
+        current_question += 1
+        self.questions_played.set(current_question)
 
-            self.next_button = Button(self.rounds_frame, text="Next Round",
-                                      fg="#FFFFFF", bg="#008BFC",
-                                      font=("Arial", 11, "bold"),
-                                      width=10, state=DISABLED,
-                                      command=self.new_round)
-            self.next_button.grid(row=7)
+        # deactivate colour buttons!
+        for item in self.quest_button_ref:
+            item.config(state=DISABLED)
 
-            # at start, get 'new round'
-            self.new_round()
+        if current_question == how_many:
+            self.next_button.config(state=DISABLED)
+            self.next_button['text'] = "Play Again"
 
+            # change all colour button background to light grey
+            for item in self.quest_button_ref:
+                item['bg'] = "#C0C0C0"
+
+        else:
+            # enable next round button and update heading
+            self.next_button.config(state=NORMAL)
     def get_all_questions(self):
         file = open("study_of.csv", "r")
         var_all_questions = list(csv.reader(file, delimiter=","))
@@ -218,10 +214,52 @@ class Play:
         return var_all_questions
 
     def new_round(self):
-
         # disable next button (renable it at the end
         # of the round)
+
         self.next_button.config(state=DISABLED)
+
+        question_ans = random.choice(self.all_questions)
+        question = question_ans[0]
+        correct_answer = question_ans[1]
+        self.stored_correct_answer.set(correct_answer)
+
+        how_many = self.questions_wanted.get()
+        current_round = self.questions_played.get()
+        new_heading = "Choose - Round {} of " \
+                      "{}".format(current_round + 1, how_many)
+        self.choose_heading.config(text=new_heading)
+
+        all_answers = [correct_answer]
+
+        while len(all_answers) < 4:
+            # choose another question / answer pair
+            incorrect_question = random.choice(self.all_questions)
+
+            # if we chose a pair that does not have the right answer, add
+            # the wrong answer to the list of choices
+            if incorrect_question[1] != correct_answer:
+                all_answers.append(incorrect_question[1])
+
+        random.shuffle(all_answers)
+
+        # second item of list
+        print(all_answers)
+
+        print(f"Question: {question}  |  Answer: {correct_answer}")
+
+        self.next_button.config(state=DISABLED)
+
+        self.next_button.config(bg="#ffff00")
+        self.instructions_label.config(text=f"What is {question}?")
+
+        count = 0
+        for count, item in enumerate(self.quest_button_ref):
+            item['text'] = all_answers[count]
+            item['state'] = NORMAL
+
+            count += 1
+
 
     def close_play(self):
         root.destroy()
